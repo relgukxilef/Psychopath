@@ -8,9 +8,9 @@ struct tic_tac_toe {
     static const int player_size = 2;
     static const int position_digest_size = 1;
 
-    const uint64_t board = 0b111'111'111;
-    const int player_o = 0, player_x = 9;
-    const uint64_t
+    static constexpr uint64_t board = 0b111'111'111;
+    static constexpr int player_o = 0, player_x = 9;
+    static constexpr uint64_t
         vertical = 0b001'001'001,
         horizontal = 0b111,
         diagonal_0 = 0b001'010'100,
@@ -23,29 +23,30 @@ struct tic_tac_toe {
         int scores[2];
         score(p, scores);
         moves[0] = 0;
-        if (scores[0] == 1) // still a draw
+        if (scores[0] == 1) // no winner yet
             moves[0] = board & ~((p >> player_o) | (p >> player_x));
     }
     void score(position_t p, int* scores) {
-        scores[1] = 1; // 1 = draw
+        int score_x = 1; // 1 = draw
         for (int player = 0; player < 2; player++) {
             for (int i = 0; i < 3; i++) {
                 if (
-                    ((p >> i) & vertical) == vertical ||
-                    ((p >> i * 3) & horizontal) == horizontal
+                    (((p >> i) & vertical) == vertical) |
+                    (((p >> i * 3) & horizontal) == horizontal)
                 ) {
-                    scores[1] = 2 * player;
+                    score_x = 2 * player;
                 }
             }
             if (
-                (p & diagonal_0) == diagonal_0 ||
+                (p & diagonal_0) == diagonal_0 |
                 (p & diagonal_1) == diagonal_1
             ) {
-                scores[1] = 2 * player;
+                score_x = 2 * player;
             }
             p >>= player_x;
         }
-        scores[0] = 2 - scores[1];
+        scores[0] = 2 - score_x;
+        scores[1] = score_x;
     }
     position_t play(position_t p, int move, uint64_t* color) {
         color[0] = move;
@@ -71,7 +72,7 @@ struct tic_tac_toe {
     }
 };
 
-TEST_CASE("tic_tac_toes") {
+TEST_CASE("tic_tac_toe") {
     tic_tac_toe game;
     monte_carlo_tree_search<tic_tac_toe> search(game);
     monte_carlo_tree_search_thread<tic_tac_toe> thread(search);
@@ -81,7 +82,10 @@ TEST_CASE("tic_tac_toes") {
     uint64_t moves;
     game.moves(p, &moves);
     CHECK(moves == 0b111'111'111);
-    for (int i = 0; i < 7; i++) {
+    p = game.play(p, 0, colors);
+    game.moves(p, &moves);
+    CHECK(moves == 0b111'111'110);
+    for (int i = 1; i < 7; i++) {
         p = game.play(p, i, colors);
     }
     CHECK(p == 0b000101010'001010101);
@@ -89,14 +93,21 @@ TEST_CASE("tic_tac_toes") {
     game.score(p, scores);
     CHECK(scores[0] == 2);
     CHECK(scores[1] == 0);
+    game.moves(p, &moves);
+    CHECK(moves == 0);
     game.print(p);
 
     printf("\n");
 
-    thread.step(1000000);
+    thread.step(1000);
+    CHECK(thread.get_best_move() == 4); // Center
+
+    game.print(thread.start_position);
+
     for (int i = 0; i < 50; i++) {
-        thread.step(1);
-        game.print(thread.current_position);
+        thread.play(thread.get_best_move());
+        game.print(thread.start_position);
         printf("--- %d\n\n", i);
+        thread.step(10000);
     }
 }

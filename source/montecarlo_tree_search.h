@@ -38,6 +38,9 @@ template<Playable Game>
 struct monte_carlo_tree_search_thread {
     monte_carlo_tree_search_thread(monte_carlo_tree_search<Game>& search);
     void step(int steps);
+    int get_best_move();
+    void play(int move);
+
     monte_carlo_tree_search<Game>& search;
 
     typename Game::position_t current_position;
@@ -70,6 +73,10 @@ struct monte_carlo_tree_search_thread {
     std::vector<int> current_line;
 
     uint32_t random_state;
+
+    std::vector<int> start_line;
+    typename Game::position_t start_position;
+    int start_node;
 };
 
 template<Playable Game>
@@ -98,6 +105,8 @@ monte_carlo_tree_search_thread<Game>::monte_carlo_tree_search_thread(
     moves_prefix_sum = std::make_unique<int[]>(Game::move_size);
 
     current_position = search.game.start();
+    start_position = current_position;
+    start_node = 0;
     random_state = 1;
 
     search.game.moves(current_position, moves.get());
@@ -111,6 +120,7 @@ monte_carlo_tree_search_thread<Game>::monte_carlo_tree_search_thread(
     positions_move = {-1};
     positions_expanded = {true};
     current_line = {0};
+    start_line = {0};
 
     // TODO: move this to function
     // TODO: remove inner loop in index_of_nth_one
@@ -148,11 +158,11 @@ void monte_carlo_tree_search_thread<Game>::step(int steps) {
         } else {
             evaluate_game(*this);
 
-            current_line = {0};
-            current_position = search.game.start();
+            current_line = start_line;
+            current_position = start_position;
 
             // select next position to simulate
-            int position = 0;
+            int position = start_node;
             while (positions_expanded[position]) {
                 int player = search.game.player(current_position);
                 int children_count =
@@ -227,5 +237,49 @@ void monte_carlo_tree_search_thread<Game>::step(int steps) {
                 }
             }
         }
+    }
+}
+
+template<Playable Game>
+int monte_carlo_tree_search_thread<Game>::get_best_move() {
+    int best_move = 0;
+    float best_score = 0;
+    int player = search.game.player(start_position);
+    for (
+        int child = positions_begin_child[start_node];
+        child < positions_end_child[start_node];
+        child++
+    ) {
+        float score = positions_score_count[child];
+        if (score > best_score) {
+            best_move = child;
+            best_score = score;
+        }
+    }
+
+    return positions_move[best_move];
+}
+
+template<Playable Game>
+void monte_carlo_tree_search_thread<Game>::play(int move) {
+    int child = 0;
+    for (
+        child = positions_begin_child[start_node];
+        child < positions_end_child[start_node] &&
+        positions_move[child] != move;
+        child++
+    );
+
+    if (
+        child > 0 && positions_expanded[child]
+    ) {
+        start_node = child;
+        start_position = search.game.play(start_position, move, colors.get());
+        start_line.push_back(child);
+
+    } else {
+        start_node = 0;
+        start_position = search.game.start();
+        start_line = {0};
     }
 }
