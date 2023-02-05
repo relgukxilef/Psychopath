@@ -72,7 +72,7 @@ struct tic_tac_toe {
     }
 };
 
-TEST_CASE("tic_tac_toe") {
+TEST_CASE("games/tic_tac_toe") {
     tic_tac_toe game;
     monte_carlo_tree_search<tic_tac_toe> search(game);
     monte_carlo_tree_search_thread<tic_tac_toe> thread(search);

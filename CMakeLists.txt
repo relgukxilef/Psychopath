@@ -9,6 +9,7 @@ add_executable(
     Psychopath test.cpp
     source/utility.h source/utility.cpp
     source/montecarlo_tree_search.h source/montecarlo_tree_search.cpp
+    source/solver.h source/solver.cpp
 )
 
 target_link_options(Psychopath PRIVATE -static)
